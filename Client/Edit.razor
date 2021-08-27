@@ -1,0 +1,100 @@
+@using Oqtane.Modules.Controls
+@using Emp.form.Services
+@using Emp.form.Models
+
+@namespace Emp.form
+@inherits ModuleBase
+@inject IformService formService
+@inject NavigationManager NavigationManager
+
+<table class="table table-borderless">
+    <tr>
+        <td>
+            <Label For="name" HelpText="Enter a name">Name: </Label>
+        </td>
+        <td>
+            <input id="name" class="form-control" @bind="@_name" />
+        </td>
+    </tr>
+</table>
+<button type="button" class="btn btn-success" @onclick="Save">Save</button>
+<NavLink class="btn btn-secondary" href="@NavigateUrl()">Cancel</NavLink>
+<br />
+<br />
+@if (PageState.Action == "Edit")
+{
+    <AuditInfo CreatedBy="@_createdby" CreatedOn="@_createdon" ModifiedBy="@_modifiedby" ModifiedOn="@_modifiedon"></AuditInfo>
+}
+
+@code {
+    public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Edit;
+
+    public override string Actions => "Add,Edit";
+
+    public override string Title => "Manage form";
+
+    public override List<Resource> Resources => new List<Resource>()
+    {
+        new Resource { ResourceType = ResourceType.Stylesheet, Url = ModulePath() + "Module.css" }
+    };
+
+    int _id;
+    string _name;
+    string _createdby;
+    DateTime _createdon;
+    string _modifiedby;
+    DateTime _modifiedon;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (PageState.Action == "Edit")
+            {
+                _id = Int32.Parse(PageState.QueryString["id"]);
+                form form = await formService.GetformAsync(_id, ModuleState.ModuleId);
+                if (form != null)
+                {
+                    _name = form.Name;
+                    _createdby = form.CreatedBy;
+                    _createdon = form.CreatedOn;
+                    _modifiedby = form.ModifiedBy;
+                    _modifiedon = form.ModifiedOn;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading form {formId} {Error}", _id, ex.Message);
+            AddModuleMessage("Error Loading form", MessageType.Error);
+        }
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            if (PageState.Action == "Add")
+            {
+                form form = new form();
+                form.ModuleId = ModuleState.ModuleId;
+                form.Name = _name;
+                form = await formService.AddformAsync(form);
+                await logger.LogInformation("form Added {form}", form);
+            }
+            else
+            {
+                form form = await formService.GetformAsync(_id, ModuleState.ModuleId);
+                form.Name = _name;
+                await formService.UpdateformAsync(form);
+                await logger.LogInformation("form Updated {form}", form);
+            }
+            NavigationManager.NavigateTo(NavigateUrl());
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Saving form {Error}", ex.Message);
+            AddModuleMessage("Error Saving form", MessageType.Error);
+        }
+    }
+}
